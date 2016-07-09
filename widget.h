@@ -3,16 +3,14 @@
 
 #include <array>
 #include <map>
-
 #include <memory>
 
 #include <QWidget>
 
-#include <QDebug>
-
 typedef void* HANDLE;
 
 class Widget;
+class QTimer;
 
 struct Request
 {
@@ -20,8 +18,7 @@ struct Request
     Widget *widget;
     uint id;
 
-    Request(uint id, Widget *widget) : id(id), widget(widget){ qDebug () << "Cons"; }
-    ~Request(){ qDebug () << "Dest"; }
+    Request(uint id, Widget *widget) : id(id), widget(widget){}
 };
 
 class Widget : public QWidget
@@ -36,9 +33,14 @@ public:
     void removeRequest(uint id);
 
 signals:
-    void changed(quint32, bool);
+    void delNode(quint32);
     void newNode(quint32);
+    void sendRequest(quint32 dstIpv4);
+private slots:
+    void onSendRequest(quint32 dstIpv4);
+    void startScan();
 private:
+    void setupNetworkInterface();
 
     typedef std::map< uint, std::unique_ptr<Request> > RequestMap;
     RequestMap requestMap;
@@ -48,6 +50,12 @@ private:
 
     HANDLE hIcmp;
     uint idCounter;
+
+    QTimer *timer;
+
+    quint32 srcIpv4;
+    quint32 netStartIpv4;
+    quint32 netEndIpv4;
 };
 
 #endif // WIDGET_H

@@ -1,5 +1,10 @@
 #include "widget.h"
 
+#include <QtEndian>
+#include <QNetworkInterface>
+#include <QHostAddress>
+#include <QTimer>
+#include <QDebug>
 
 #define PIO_APC_ROUTINE_DEFINED
 
@@ -23,36 +28,91 @@ VOID NTAPI icmpProc(
     Q_UNUSED(Reserved);
     std::unique_ptr<Request> *reqPtr = (std::unique_ptr<Request> *)ApcContext;
     Request *req = reqPtr->get();
-//    DWORD bytesRecieved = IoStatusBlock->Information;
     PICMP_ECHO_REPLY32 replies = (PICMP_ECHO_REPLY32)req->arr.data();
-//    DWORD count = IcmpParseReplies(replies, bytesRecieved);
-//    Q_UNUSED(count);
-//    for (int i = 0; i < count; ++i) {
     bool nodePresent = true;
-    quint32 node = replies[0].Address;
+    quint32 node = qFromBigEndian<quint32>(replies[0].Address);
     if (replies[0].Status != IP_SUCCESS) {
         nodePresent = false;
-//            emit error();
+        if (replies[0].Status != IP_REQ_TIMED_OUT) {
+            //            emit error();
+        }
     }
     req->widget->setNodeInfo(node, nodePresent);
     req->widget->removeRequest(req->id);
-//    }
-
-    return;
 }
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent),
-      idCounter(0)
+      hIcmp(IcmpCreateFile()),
+      idCounter(0),
+      timer( new QTimer(this) ),
+      srcIpv4(0)
 {
-    in_addr dst = { 192, 168, 1, 1 };
-    in_addr src = { 192, 168, 1, 101 };
+    timer->setInterval(1000*10);
+
+    setupNetworkInterface();
+
+    connect(timer, &QTimer::timeout, this, &Widget::startScan);
+    connect(this, &Widget::sendRequest, this, &Widget::onSendRequest);
+
+    timer->start();
+}
+
+void Widget::setupNetworkInterface()
+{
+    quint32 suitableAddress = 0;
+    QList<QNetworkInterface> interfaceList = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface &netInterface : interfaceList)
+    {
+        if (srcIpv4 != 0) {
+            break;
+        }
+        qDebug () << netInterface;
+        for (QNetworkAddressEntry &addressEntry : netInterface.addressEntries())
+        {
+            quint32 convertedAddress;
+            QHostAddress hostAddress = addressEntry.ip();
+//            qDebug () << addressEntry;
+            qDebug () << hostAddress;
+            if (hostAddress.protocol() != QAbstractSocket::IPv4Protocol ||
+                hostAddress.isLoopback())
+            {
+                continue;
+            }
+            bool ok = false;
+            convertedAddress = hostAddress.toIPv4Address(&ok);
+            if (!ok) {
+                continue;
+            }
+            suitableAddress = convertedAddress;
+
+            int netmask = 32 - addressEntry.prefixLength();
+            netStartIpv4 = ((suitableAddress >> netmask) << netmask) + 1;
+            netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
+
+            if (hostAddress.isInSubnet(QHostAddress("192.168.0.0"), 16) ||
+                    hostAddress.isInSubnet(QHostAddress("10.0.0.0"), 8)) {
+                srcIpv4 = suitableAddress;
+                break;
+            }
+        }
+    }
+    if (suitableAddress == 0)
+    {
+//        error()
+    }
+    else if (srcIpv4 == 0)
+    {
+        srcIpv4 = suitableAddress;
+    }
+}
+
+void Widget::onSendRequest(quint32 dstIpv4)
+{
 
     std::unique_ptr<Request> * reqPtr = &(requestMap.insert(std::make_pair(idCounter, std::make_unique<Request>(idCounter,this))).first->second);
 
-
-    hIcmp = IcmpCreateFile();
-    DWORD res = IcmpSendEcho2Ex(hIcmp, 0, icmpProc, reqPtr, src.S_un.S_addr, dst.S_un.S_addr, 0, 0, 0, (*reqPtr)->arr.data(), (DWORD)(*reqPtr)->arr.size(), 100);
+    DWORD res = IcmpSendEcho2Ex(hIcmp, 0, icmpProc, reqPtr, qToBigEndian(srcIpv4), qToBigEndian(dstIpv4), 0, 0, 0, (*reqPtr)->arr.data(), (DWORD)(*reqPtr)->arr.size(), 6000);
     if (res != ERROR_IO_PENDING)
     {
         DWORD err = GetLastError();
@@ -65,6 +125,13 @@ Widget::Widget(QWidget *parent)
     idCounter++;
 }
 
+void Widget::startScan()
+{
+    for (quint32 dst = netStartIpv4; dst < netEndIpv4; ++dst) {
+        sendRequest(dst);
+    }
+}
+
 Widget::~Widget()
 {
     IcmpCloseHandle(hIcmp);
@@ -72,13 +139,12 @@ Widget::~Widget()
 
 void Widget::setNodeInfo(quint32 node, bool present)
 {
-    if (nodeMap.count(node)) {
-        if (nodeMap[node] != present) {
-            nodeMap[node] = present;
-            emit changed(node, present);
-        }
+    int count = (int)nodeMap.count(node);
+    if (count == 1 && !present) {
+        nodeMap.erase(node);
+        emit delNode(node);
     }
-    else {
+    else if (count == 0 && present) {
         nodeMap.insert(std::make_pair(node,present));
         emit newNode(node);
     }
