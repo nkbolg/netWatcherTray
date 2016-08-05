@@ -28,4 +28,10 @@
 *.out
 *.app
 
-*.pro.user
+*.pro.user*
+*boost*
+images*
+*.sln
+*.sdf
+*.VC.db
+.vs/*

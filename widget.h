@@ -3,53 +3,62 @@
 
 #include <array>
 #include <map>
+#include <set>
 #include <memory>
 
-#include <QWidget>
+#include <QSystemTrayIcon>
+#include <QStringList>
 
-typedef void* HANDLE;
-
-class Widget;
 class QTimer;
+class QMenu;
+class Pinger;
+class QHostAddress;
+class QNetworkAddressEntry;
 
-struct Request
+class Widget //: public QObject
 {
-    std::array<uchar,64> arr;
-    Widget *widget;
-    uint id;
-
-    Request(uint id, Widget *widget) : id(id), widget(widget){}
-};
-
-class Widget : public QWidget
-{
-    Q_OBJECT
+    //Q_OBJECT
 
 public:
-    Widget(QWidget *parent = 0);
+    Widget();
     ~Widget();
 
-    void setNodeInfo(quint32 node, bool present);
-    void removeRequest(uint id);
+    void showIcon();
 
-signals:
-    void delNode(quint32);
-    void newNode(quint32);
-    void sendRequest(quint32 dstIpv4);
-private slots:
-    void onSendRequest(quint32 dstIpv4);
-    void startScan();
 private:
-    void setupNetworkInterface();
+    bool setupNetworkInterface();
+    std::vector<QNetworkAddressEntry> getFilteredAddressEntries();
 
-    typedef std::map< uint, std::unique_ptr<Request> > RequestMap;
-    RequestMap requestMap;
+    class NetworkState
+    {
+    public:
+        enum State
+        {
+        Good,
+        NoInternetAccess,
+        NoLocalNetAccess,
+        Invalid
+        };
+        NetworkState(QSystemTrayIcon *icon) : currState(Invalid), icon(icon) {}
+        NetworkState& operator=(const State &state);
+    private:
+        State currState;
+        QSystemTrayIcon *icon;
+    };
 
-    typedef std::map< quint32, bool > NodeMap;
-    NodeMap nodeMap;
+    QSystemTrayIcon trayIcon;
+    NetworkState currentState;
 
-    HANDLE hIcmp;
+    typedef std::set< quint32 > PresentNodes;
+    PresentNodes presentNodes;
+    std::unique_ptr<Pinger> pingerPtr;
+    std::unique_ptr<QMenu> trayContextMenu;
+
+    std::vector<QHostAddress> interfaces;
+
+
     uint idCounter;
+
 
     QTimer *timer;
 

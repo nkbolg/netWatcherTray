@@ -15,6 +15,21 @@ CONFIG += c++11
 
 
 SOURCES += main.cpp\
-        widget.cpp
+        widget.cpp \
+    Pinger/Pinger.cpp
 
-HEADERS  += widget.h
+HEADERS  += widget.h \
+    Pinger/icmp_header.hpp \
+    Pinger/ipv4_header.hpp \
+    Pinger/Pinger.h
+
+INCLUDEPATH += $$PWD/Pinger
+LIBS += "-LD:/Users/horokey/Documents/Visual Studio 2015/Projects/Test/packages/boost_system-vc140.1.61.0.0/lib/native/address-model-64/lib/"
+
+win32-msvc* {
+CONFIG += embed_manifest_exe
+QMAKE_LFLAGS_WINDOWS += $$quote( /MANIFESTUAC:\"level=\'requireAdministrator\' uiAccess=\'false\'\" )
+}
+
+RESOURCES += \
+    icons.qrc
