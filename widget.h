@@ -5,19 +5,22 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <thread>
 
 #include <QSystemTrayIcon>
 #include <QStringList>
+#include <QObject>
 
 class QTimer;
 class QMenu;
 class Pinger;
+class QAction;
 class QHostAddress;
 class QNetworkAddressEntry;
 
-class Widget //: public QObject
+class Widget : public QObject
 {
-    //Q_OBJECT
+    Q_OBJECT
 
 public:
     Widget();
@@ -25,8 +28,16 @@ public:
 
     void showIcon();
 
+private slots:
+    void onTimerEvent();
+    void onUpdateTrayMenu();
+
+signals:
+    void updateTrayMenu();
+
 private:
     bool setupNetworkInterface();
+    void setupPersistentMenu();
     std::vector<QNetworkAddressEntry> getFilteredAddressEntries();
 
     class NetworkState
@@ -49,22 +60,26 @@ private:
     QSystemTrayIcon trayIcon;
     NetworkState currentState;
 
-    typedef std::set< quint32 > PresentNodes;
+    typedef quint32 NodeAddr;
+    typedef quint32 ThrustLevel;
+
+    typedef std::map< NodeAddr, ThrustLevel > PresentNodes;
     PresentNodes presentNodes;
     std::unique_ptr<Pinger> pingerPtr;
     std::unique_ptr<QMenu> trayContextMenu;
 
     std::vector<QHostAddress> interfaces;
-
-
-    uint idCounter;
-
+    QList<QAction*> persistentActionsList;
+    QList<QAction*> temporaryActionsList;
+    std::thread pingerThread;
 
     QTimer *timer;
 
     quint32 srcIpv4;
     quint32 netStartIpv4;
     quint32 netEndIpv4;
+
+    static const ThrustLevel maxThrustLevel = 2;
 };
 
 #endif // WIDGET_H

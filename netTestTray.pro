@@ -11,7 +11,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = netTestTray
 TEMPLATE = app
 
-CONFIG += c++11
+CONFIG += c++14
 
 
 SOURCES += main.cpp\
@@ -24,7 +24,7 @@ HEADERS  += widget.h \
     Pinger/Pinger.h
 
 INCLUDEPATH += $$PWD/Pinger
-LIBS += "-LD:/Users/horokey/Documents/Visual Studio 2015/Projects/Test/packages/boost_system-vc140.1.61.0.0/lib/native/address-model-64/lib/"
+LIBS += "-L$$PWD/Pinger/libs/native/address-model-64/lib/"
 
 win32-msvc* {
 CONFIG += embed_manifest_exe

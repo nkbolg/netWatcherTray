@@ -65,7 +65,10 @@ int main(int argc, char *argv[])
     widget.showIcon();
     return app.exec();
 }
-
+//TODO: добавить диагностику dns
+//TODO: добавить оповещающие сообщения для:
+//          смены состояний есть сеть - нет сети - нет инета
+//          появления - пропажи хостов
 #else
 
 #include <QLabel>

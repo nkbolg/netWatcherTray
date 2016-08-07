@@ -1,11 +1,12 @@
 #include "Pinger.h"
 
 #include <cstdlib>
-//#include <iostream>
 #include <thread>
-#include "boost\asio\basic_waitable_timer.hpp"
-#include "boost\system\error_code.hpp"
-#include "boost\asio\io_service.hpp"
+
+#include <boost/asio/basic_waitable_timer.hpp>
+#include <boost/system/error_code.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/icmp.hpp>
 
 using namespace boost::asio;
 
@@ -28,14 +29,7 @@ unsigned short get_identifier()
 #endif
 }
 
-ServicePtr createService()
-{
-    return std::make_shared<boost::asio::io_service>();
-}
-
 Pinger::Pinger()
-    :servicePtr(createService()),
-    icmpSocket(*servicePtr.get(), ip::icmp::v4())
 {
     icmp_header echo_request(requestBuf);
     echo_request.type(icmp_header::echo_request);
@@ -51,6 +45,9 @@ Pinger::~Pinger()
 
 std::vector<uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
 {
+    io_service ioService;
+    ip::icmp::socket icmpSocket(ioService, ip::icmp::v4());
+
     std::vector<uint> hosts;
     //TODO: split to chunks of max available requests
     std::size_t numOfHosts = netEnd - netStart;
@@ -75,7 +72,8 @@ std::vector<uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::millisec
 
     std::thread worker;
     std::size_t counter = 0;
-    basic_waitable_timer<std::chrono::high_resolution_clock> timer(*servicePtr.get(), timeout);
+
+    basic_waitable_timer<std::chrono::high_resolution_clock> timer(ioService);
 
     for (uint addr = netStart; addr < netEnd; addr++)
     {
@@ -94,7 +92,6 @@ std::vector<uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::millisec
             counter++;
             if (counter == numOfHosts)
             {
-//                std::cout << "Complete" << std::endl;
                 timer.cancel();
             }
             charbuf cbuf((char*)data, (char*)data + replyBufferSize);
@@ -112,28 +109,31 @@ std::vector<uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::millisec
         });
 
         data += replyBufferSize;
+
         std::this_thread::sleep_for(5ms);
 
         if (addr % 64 == 0 && !worker.joinable())
         {
-            worker = std::thread([service = servicePtr.get()]{ service->run(); });
-        }   
+            worker = std::thread([service = &ioService]{ service->run(); });
+        }
     }
 
-
-    timer.async_wait([service = servicePtr.get()]
+    timer.expires_from_now(timeout);
+    timer.async_wait([service = &ioService]
     (const boost::system::error_code& error)
     {
         if (!error)
         {
-//            std::cout << "timer" << std::endl;
             service->stop();
         }
     });
 
-    worker.join();
-    servicePtr->run();
-    servicePtr->reset();
+    if (worker.joinable())
+    {
+        worker.join();
+    }
+    ioService.run();
+    ioService.reset();
 
     return hosts;
 }
