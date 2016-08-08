@@ -23,6 +23,7 @@ Widget::Widget()
       currentState(&trayIcon),
       pingerPtr (std::make_unique<Pinger>()),
       trayContextMenu (std::make_unique<QMenu>()),
+      threadWorking(false),
       timer( new QTimer(this) ),
       srcIpv4(0)
 {
@@ -150,6 +151,9 @@ Widget::~Widget()
 {
     if (pingerThread.joinable())
     {
+        if (threadWorking) {
+            pingerPtr->stop();
+        }
         pingerThread.join();
     }
 }
@@ -161,11 +165,17 @@ void Widget::showIcon()
 
 void Widget::onTimerEvent()
 {
-//    trayIcon.showMessage("Timer event", "Timer event");
+    qDebug () << "Timer event";
+    if (threadWorking) {
+        return;
+    }
     if (pingerThread.joinable()) {
         pingerThread.join();
     }
     pingerThread = std::thread([this](){
+       threadWorking = true;
+       qDebug () << "Ping started";
+
        auto res = pingerPtr->ping(netStartIpv4, netEndIpv4, 7s);
 
        qDebug () << res.size();
@@ -209,11 +219,12 @@ void Widget::onTimerEvent()
        }
 
        if (presentNodes.size() == 0 ||
-           presentNodes.size() == 1 && presentNodes.count(srcIpv4)) {
+           (presentNodes.size() == 1 && presentNodes.count(srcIpv4))) {
            tmpState = NetworkState::NoLocalNetAccess;
        }
        currentState = tmpState;
        emit updateTrayMenu();
+       threadWorking = false;
     });
 }
 

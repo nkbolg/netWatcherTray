@@ -24,11 +24,16 @@ HEADERS  += widget.h \
     Pinger/Pinger.h
 
 INCLUDEPATH += $$PWD/Pinger
-LIBS += "-L$$PWD/Pinger/libs/native/address-model-64/lib/"
+
+win32-g++ {
+LIBS += "C:/Boost/lib/libboost_system-mgw49-mt-d-1_61.a" -lWs2_32
+}
 
 win32-msvc* {
 CONFIG += embed_manifest_exe
 QMAKE_LFLAGS_WINDOWS += $$quote( /MANIFESTUAC:\"level=\'requireAdministrator\' uiAccess=\'false\'\" )
+
+LIBS += "-L$$PWD/Pinger/libs/native/address-model-64/lib/"
 }
 
 RESOURCES += \

@@ -6,6 +6,7 @@
 #include <set>
 #include <memory>
 #include <thread>
+#include <atomic>
 
 #include <QSystemTrayIcon>
 #include <QStringList>
@@ -72,6 +73,7 @@ private:
     QList<QAction*> persistentActionsList;
     QList<QAction*> temporaryActionsList;
     std::thread pingerThread;
+    std::atomic_bool threadWorking;
 
     QTimer *timer;
 
