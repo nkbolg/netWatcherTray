@@ -151,9 +151,9 @@ Widget::~Widget()
 {
     if (pingerThread.joinable())
     {
-        if (threadWorking) {
-            pingerPtr->stop();
-        }
+//        if (threadWorking) {
+//            pingerPtr->stop();
+//        }
         pingerThread.join();
     }
 }
