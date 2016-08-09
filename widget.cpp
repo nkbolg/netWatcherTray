@@ -4,19 +4,15 @@
 #include <QHostAddress>
 #include <QTimer>
 #include <QDebug>
-
 #include <QApplication>
 #include <QMessageBox>
 #include <QString>
-
-#include "Pinger/Pinger.h"
 
 Q_DECLARE_METATYPE(QNetworkAddressEntry)
 
 Widget::Widget()
     : QObject(),
       currentState(&trayIcon),
-      pingerPtr (std::make_unique<Pinger>()),
       persistentActionGroup(this),
       timer(new QTimer(this)),
       srcIpv4(0)
@@ -159,7 +155,7 @@ void Widget::onTimerEvent()
         pingerThread.join();
     }
     pingerThread = std::thread([this](){
-       auto res = pingerPtr->ping(netStartIpv4, netEndIpv4, 7s);
+       auto res = pinger.ping(netStartIpv4, netEndIpv4, 7s);
 
        qDebug () << res.size();
        for (auto&& elem : res)
@@ -185,7 +181,7 @@ void Widget::onTimerEvent()
        NetworkState::State tmpState;
        //ping google dns to check internet access
        quint32 googlePublicDNS = 0x08080808;
-       res = pingerPtr->ping(googlePublicDNS, googlePublicDNS+1, 1s);
+       res = pinger.ping(googlePublicDNS, googlePublicDNS+1, 1s);
 
        qDebug () << res.size();
        for (auto&& elem : res)

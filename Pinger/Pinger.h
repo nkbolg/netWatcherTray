@@ -7,7 +7,6 @@
 
 using namespace std::chrono_literals;
 
-typedef unsigned int uint;
 
 class Pinger
 {
@@ -15,6 +14,7 @@ public:
     Pinger();
     ~Pinger();
 
+    typedef unsigned int uint;
     std::vector<uint> ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout = 10s);
 private:
     unsigned char requestBuf[8];

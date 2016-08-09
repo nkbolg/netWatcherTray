@@ -43,7 +43,7 @@ Pinger::~Pinger()
 {
 }
 
-std::vector<uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
+std::vector<Pinger::uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
 {
     io_service ioService;
     ip::icmp::socket icmpSocket(ioService, ip::icmp::v4());

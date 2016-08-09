@@ -2,7 +2,6 @@
 #define WIDGET_H
 
 #include <map>
-#include <memory>
 #include <thread>
 
 #include <QSystemTrayIcon>
@@ -11,8 +10,9 @@
 #include <QMenu>
 #include <QList>
 
+#include "Pinger/Pinger.h"
+
 class QTimer;
-class Pinger;
 class QAction;
 class QNetworkAddressEntry;
 
@@ -59,13 +59,13 @@ private:
     QSystemTrayIcon trayIcon;
     QMenu trayContextMenu;
     NetworkState currentState;
+    Pinger pinger;
 
     typedef quint32 NodeAddr;
     typedef quint32 ThrustLevel;
 
     typedef std::map< NodeAddr, ThrustLevel > PresentNodes;
     PresentNodes presentNodes;
-    std::unique_ptr<Pinger> pingerPtr;
 
     QActionGroup persistentActionGroup;
     QList<QAction*> temporaryActionsList;
