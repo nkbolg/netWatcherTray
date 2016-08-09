@@ -1,22 +1,19 @@
 #ifndef WIDGET_H
 #define WIDGET_H
 
-#include <array>
 #include <map>
-#include <set>
 #include <memory>
 #include <thread>
 
 #include <QSystemTrayIcon>
 #include <QActionGroup>
-#include <QStringList>
 #include <QObject>
+#include <QMenu>
+#include <QList>
 
 class QTimer;
-class QMenu;
 class Pinger;
 class QAction;
-class QHostAddress;
 class QNetworkAddressEntry;
 
 class Widget : public QObject
@@ -60,6 +57,7 @@ private:
     };
 
     QSystemTrayIcon trayIcon;
+    QMenu trayContextMenu;
     NetworkState currentState;
 
     typedef quint32 NodeAddr;
@@ -68,7 +66,6 @@ private:
     typedef std::map< NodeAddr, ThrustLevel > PresentNodes;
     PresentNodes presentNodes;
     std::unique_ptr<Pinger> pingerPtr;
-    std::unique_ptr<QMenu> trayContextMenu;
 
     QActionGroup persistentActionGroup;
     QList<QAction*> temporaryActionsList;

@@ -1,6 +1,5 @@
 #include "widget.h"
 
-#include <QtEndian>
 #include <QNetworkInterface>
 #include <QHostAddress>
 #include <QTimer>
@@ -8,12 +7,7 @@
 
 #include <QApplication>
 #include <QMessageBox>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QListWidget>
-#include <QList>
 #include <QString>
-#include <QMenu>
 
 #include "Pinger/Pinger.h"
 
@@ -23,9 +17,8 @@ Widget::Widget()
     : QObject(),
       currentState(&trayIcon),
       pingerPtr (std::make_unique<Pinger>()),
-      trayContextMenu (std::make_unique<QMenu>()),
       persistentActionGroup(this),
-      timer( new QTimer(this) ),
+      timer(new QTimer(this)),
       srcIpv4(0)
 {
     timer->setInterval(1000*10);
@@ -69,7 +62,7 @@ void Widget::setupPersistentMenu(const std::vector<QNetworkAddressEntry> &interf
     currentState = NetworkState::Good;
 
     persistentActionGroup.addAction(QStringLiteral("Interfaces"));
-    persistentActionGroup.addAction("")->setSeparator(true);
+    persistentActionGroup.addAction(QString())->setSeparator(true);
 
     for (auto &&entry : interfaces)
     {
@@ -84,16 +77,16 @@ void Widget::setupPersistentMenu(const std::vector<QNetworkAddressEntry> &interf
         }
     }
 
-    persistentActionGroup.addAction("")->setSeparator(true);
+    persistentActionGroup.addAction(QString())->setSeparator(true);
 
     auto actExit = persistentActionGroup.addAction(QStringLiteral("Exit"));
     connect(actExit, &QAction::triggered, qApp, &QApplication::quit);
 
     connect(&persistentActionGroup, &QActionGroup::triggered, this, &Widget::onSetInterfaceActive);
 
-    trayContextMenu->addActions(persistentActionGroup.actions());
+    trayContextMenu.addActions(persistentActionGroup.actions());
 
-    trayIcon.setContextMenu(trayContextMenu.get());
+    trayIcon.setContextMenu(&trayContextMenu);
 }
 
 bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces)
@@ -122,8 +115,8 @@ bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces
             netStartIpv4 = ((suitableAddress >> netmask) << netmask) + 1;
             netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
 
-            if (hostAddress.isInSubnet(QHostAddress("192.168.0.0"), 16) ||
-                    hostAddress.isInSubnet(QHostAddress("10.0.0.0"), 8))
+            if (hostAddress.isInSubnet(QHostAddress(QStringLiteral("192.168.0.0")), 16) ||
+                    hostAddress.isInSubnet(QHostAddress(QStringLiteral("10.0.0.0")), 8))
             {
                 srcIpv4 = suitableAddress;
             }
@@ -131,13 +124,13 @@ bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces
     }
     if (suitableAddress == 0)
     {
-        QMessageBox::warning(0, "No suitable Ipv4 interface found", "No suitable Ipv4 interface found.\nApplication is shutting down.");
+        QMessageBox::warning(0, QStringLiteral("No suitable Ipv4 interface found"), QStringLiteral("No suitable Ipv4 interface found.\nApplication is shutting down."));
         return false;
     }
     //autoconf ipv4 ( 169.254.248.201 ) - invalid
     if (suitableAddress == 0xA9FEF8C9 && srcIpv4 == 0)
     {
-        QMessageBox::warning(0, "Ipv4 autoconfigurated interface found", "Ipv4 autoconfigurated interface found.\nApplication is shutting down.");
+        QMessageBox::warning(0, QStringLiteral("Ipv4 autoconfigurated interface found"), QStringLiteral("Ipv4 autoconfigurated interface found.\nApplication is shutting down."));
         return false;
     }
     else if (srcIpv4 == 0)
@@ -219,7 +212,7 @@ void Widget::onTimerEvent()
 
 void Widget::onUpdateTrayMenu()
 {
-    trayContextMenu->clear();
+    trayContextMenu.clear();
 
     qDeleteAll(temporaryActionsList);
     temporaryActionsList.clear();
@@ -238,8 +231,8 @@ void Widget::onUpdateTrayMenu()
     sep->setSeparator(true);
     temporaryActionsList << sep;
 
-    trayContextMenu->addActions(temporaryActionsList);
-    trayContextMenu->addActions(persistentActionGroup.actions());
+    trayContextMenu.addActions(temporaryActionsList);
+    trayContextMenu.addActions(persistentActionGroup.actions());
 }
 
 void Widget::onSetInterfaceActive(QAction *sender)
@@ -266,20 +259,20 @@ Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState
     currState = state;
     switch (currState) {
     case Good:
-        icon->setToolTip("Ok");
-        icon->setIcon(QIcon(":/images/ok.png"));
+        icon->setToolTip(QStringLiteral("Ok"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/ok.png")));
         break;
     case NoInternetAccess:
-        icon->setToolTip("No internet access");
-        icon->setIcon(QIcon(":/images/noint.png"));
+        icon->setToolTip(QStringLiteral("No internet access"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/noint.png")));
         break;
     case NoLocalNetAccess:
-        icon->setToolTip("No local network access");
-        icon->setIcon(QIcon(":/images/noloc.png"));
+        icon->setToolTip(QStringLiteral("No local network access"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/noloc.png")));
         break;
     default:
         icon->setIcon(QIcon());
-        icon->setToolTip("Err");
+        icon->setToolTip(QStringLiteral("Err"));
         break;
     }
     return *this;
