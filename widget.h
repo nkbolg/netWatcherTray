@@ -38,8 +38,8 @@ signals:
     void updateTrayMenu();
 
 private:
-    bool setupNetworkInterface();
-    void setupPersistentMenu();
+    bool setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces);
+    void setupPersistentMenu(const std::vector<QNetworkAddressEntry> &interfaces);
     std::vector<QNetworkAddressEntry> getFilteredAddressEntries();
 
     class NetworkState
@@ -70,7 +70,6 @@ private:
     std::unique_ptr<Pinger> pingerPtr;
     std::unique_ptr<QMenu> trayContextMenu;
 
-    std::vector<QNetworkAddressEntry> interfaces;
     QActionGroup persistentActionGroup;
     QList<QAction*> temporaryActionsList;
     std::thread pingerThread;

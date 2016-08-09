@@ -17,6 +17,7 @@
 
 #include "Pinger/Pinger.h"
 
+Q_DECLARE_METATYPE(QNetworkAddressEntry)
 
 Widget::Widget()
     : QObject(),
@@ -32,12 +33,13 @@ Widget::Widget()
 
     connect(this, &Widget::updateTrayMenu, this, &Widget::onUpdateTrayMenu);
 
-    if (!setupNetworkInterface()) {
+    std::vector<QNetworkAddressEntry> interfaces;
+    if (!setupNetworkInterface(interfaces)) {
         qApp->quit();
         return;
     }
 
-    setupPersistentMenu();
+    setupPersistentMenu(interfaces);
 
     timer->start();
 }
@@ -62,7 +64,7 @@ std::vector<QNetworkAddressEntry> Widget::getFilteredAddressEntries()
     return resultVector;
 }
 
-void Widget::setupPersistentMenu()
+void Widget::setupPersistentMenu(const std::vector<QNetworkAddressEntry> &interfaces)
 {
     currentState = NetworkState::Good;
 
@@ -74,6 +76,9 @@ void Widget::setupPersistentMenu()
         QHostAddress hostAddr = entry.ip();
         auto act = persistentActionGroup.addAction(hostAddr.toString());
         act->setCheckable(true);
+        QVariant var;
+        var.setValue<QNetworkAddressEntry>(entry);
+        act->setData(var);
         if (hostAddr.toIPv4Address() == srcIpv4) {
             act->setChecked(true);
         }
@@ -91,7 +96,7 @@ void Widget::setupPersistentMenu()
     trayIcon.setContextMenu(trayContextMenu.get());
 }
 
-bool Widget::setupNetworkInterface()
+bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces)
 {
     if (srcIpv4 != 0) {
         return true;
@@ -239,18 +244,18 @@ void Widget::onUpdateTrayMenu()
 
 void Widget::onSetInterfaceActive(QAction *sender)
 {
-    quint32 addr = QHostAddress(sender->text()).toIPv4Address();
-    for (auto &&elem : interfaces)
-    {
-        if (elem.ip().toIPv4Address() == addr) {
-            sender->setChecked(true);
-            int netmask = 32 - elem.prefixLength();
-            netStartIpv4 = ((addr >> netmask) << netmask) + 1;
-            netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
-            srcIpv4 = addr;
-            //TODO: добавить прерывание активного сканирования
-        }
+    bool ok = false;
+    quint32 tempIPv4 = QHostAddress(sender->text()).toIPv4Address(&ok);
+    if (!ok) {
+        return;
     }
+
+    QNetworkAddressEntry addr = sender->data().value<QNetworkAddressEntry>();
+    srcIpv4 = tempIPv4;
+    int netmask = 32 - addr.prefixLength();
+    netStartIpv4 = ((srcIpv4 >> netmask) << netmask) + 1;
+    netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
+    //TODO: добавить прерывание активного сканирования
 }
 
 Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState::State &state)
