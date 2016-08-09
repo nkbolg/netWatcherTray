@@ -8,6 +8,7 @@
 #include <thread>
 
 #include <QSystemTrayIcon>
+#include <QActionGroup>
 #include <QStringList>
 #include <QObject>
 
@@ -31,6 +32,7 @@ public:
 private slots:
     void onTimerEvent();
     void onUpdateTrayMenu();
+    void onSetInterfaceActive(QAction *sender);
 
 signals:
     void updateTrayMenu();
@@ -68,8 +70,8 @@ private:
     std::unique_ptr<Pinger> pingerPtr;
     std::unique_ptr<QMenu> trayContextMenu;
 
-    std::vector<QHostAddress> interfaces;
-    QList<QAction*> persistentActionsList;
+    std::vector<QNetworkAddressEntry> interfaces;
+    QActionGroup persistentActionGroup;
     QList<QAction*> temporaryActionsList;
     std::thread pingerThread;
 

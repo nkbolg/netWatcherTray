@@ -23,6 +23,7 @@ Widget::Widget()
       currentState(&trayIcon),
       pingerPtr (std::make_unique<Pinger>()),
       trayContextMenu (std::make_unique<QMenu>()),
+      persistentActionGroup(this),
       timer( new QTimer(this) ),
       srcIpv4(0)
 {
@@ -65,32 +66,27 @@ void Widget::setupPersistentMenu()
 {
     currentState = NetworkState::Good;
 
-    persistentActionsList << new QAction(QStringLiteral("Interfaces"), this);
-
-    auto actionSep = new QAction(this);
-    actionSep->setSeparator(true);
-    persistentActionsList << actionSep;
+    persistentActionGroup.addAction(QStringLiteral("Interfaces"));
+    persistentActionGroup.addAction("")->setSeparator(true);
 
     for (auto &&entry : interfaces)
     {
-        auto act = new QAction(entry.toString(), this);
-        if (entry.toIPv4Address() == srcIpv4) {
-            act->setCheckable(true);
+        QHostAddress hostAddr = entry.ip();
+        auto act = persistentActionGroup.addAction(hostAddr.toString());
+        act->setCheckable(true);
+        if (hostAddr.toIPv4Address() == srcIpv4) {
             act->setChecked(true);
         }
-        persistentActionsList << act;
     }
 
-    actionSep = new QAction(this);
-    actionSep->setSeparator(true);
-    persistentActionsList << actionSep;
+    persistentActionGroup.addAction("")->setSeparator(true);
 
-    auto actExit = new QAction(QStringLiteral("Exit"), this);
+    auto actExit = persistentActionGroup.addAction(QStringLiteral("Exit"));
     connect(actExit, &QAction::triggered, qApp, &QApplication::quit);
 
-    persistentActionsList << actExit;
+    connect(&persistentActionGroup, &QActionGroup::triggered, this, &Widget::onSetInterfaceActive);
 
-    trayContextMenu->addActions(persistentActionsList);
+    trayContextMenu->addActions(persistentActionGroup.actions());
 
     trayIcon.setContextMenu(trayContextMenu.get());
 }
@@ -113,7 +109,7 @@ bool Widget::setupNetworkInterface()
             continue;
         }
 
-        interfaces.push_back(hostAddress);
+        interfaces.push_back(addressEntry);
 
         if (srcIpv4 == 0) {
             suitableAddress = convertedAddress;
@@ -161,7 +157,6 @@ void Widget::showIcon()
 
 void Widget::onTimerEvent()
 {
-//    trayIcon.showMessage("Timer event", "Timer event");
     if (pingerThread.joinable()) {
         pingerThread.join();
     }
@@ -219,7 +214,6 @@ void Widget::onTimerEvent()
 
 void Widget::onUpdateTrayMenu()
 {
-//    trayIcon.showMessage("Menu update", "Update requsted");
     trayContextMenu->clear();
 
     qDeleteAll(temporaryActionsList);
@@ -240,7 +234,23 @@ void Widget::onUpdateTrayMenu()
     temporaryActionsList << sep;
 
     trayContextMenu->addActions(temporaryActionsList);
-    trayContextMenu->addActions(persistentActionsList);
+    trayContextMenu->addActions(persistentActionGroup.actions());
+}
+
+void Widget::onSetInterfaceActive(QAction *sender)
+{
+    quint32 addr = QHostAddress(sender->text()).toIPv4Address();
+    for (auto &&elem : interfaces)
+    {
+        if (elem.ip().toIPv4Address() == addr) {
+            sender->setChecked(true);
+            int netmask = 32 - elem.prefixLength();
+            netStartIpv4 = ((addr >> netmask) << netmask) + 1;
+            netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
+            srcIpv4 = addr;
+            //TODO: добавить прерывание активного сканирования
+        }
+    }
 }
 
 Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState::State &state)
