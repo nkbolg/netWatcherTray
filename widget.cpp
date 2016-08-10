@@ -141,9 +141,9 @@ Widget::~Widget()
 {
     if (pingerThread.joinable())
     {
-//        if (threadWorking) {
-//            pingerPtr->stop();
-//        }
+        if (threadWorking) {
+            pinger.stop();
+        }
         pingerThread.join();
     }
 }
@@ -163,6 +163,7 @@ void Widget::onTimerEvent()
         pingerThread.join();
     }
     pingerThread = std::thread([this](){
+        //TODO: add scope guard for threadWorking
        threadWorking = true;
        qDebug () << "Ping started";
 

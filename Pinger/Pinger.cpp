@@ -89,18 +89,23 @@ std::vector<Pinger::uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::
         if (stopped) {
             break;
         }
-        icmpSocket.async_send_to(buffer(requestBuf),ip::icmp::endpoint(ip::address_v4(addr),0),[addr]
-        (const boost::system::error_code& error, std::size_t /*bytes_transferred*/)
+        icmpSocket.async_send_to(buffer(requestBuf),ip::icmp::endpoint(ip::address_v4(addr),0),[]
+        (const boost::system::error_code& /*error*/, std::size_t /*bytes_transferred*/)
         {
-            if (error)
-            {
+//            if (error)
+//            {
 //                std::cout << addr << " send err: " << error << std::endl;
-            }
+//            }
         });
 
         icmpSocket.async_receive(buffer(data, replyBufferSize),
-            [data, replyBufferSize = this->replyBufferSize, &hosts, &counter, &numOfHosts, &timer]
+            [data, replyBufferSize = this->replyBufferSize,
+             &hosts, &counter, &numOfHosts, &timer,
+             &stopped = this->stopped, ioServicePtr = ioService.get()]
         (const boost::system::error_code& /*error*/, std::size_t /*bytes_transferred*/) {
+            if (stopped) {
+                ioServicePtr->stop();
+            }
             counter++;
             if (counter == numOfHosts)
             {
