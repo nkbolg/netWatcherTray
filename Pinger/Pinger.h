@@ -14,11 +14,12 @@ public:
     Pinger();
     ~Pinger();
 
+
     typedef unsigned int uint;
-    std::vector<uint> ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout = 10s);
+    std::vector<uint> ping(uint srcIPv4, uint netStart, uint netEnd, std::chrono::milliseconds timeout = 10s);
+
 private:
     unsigned char requestBuf[8];
-
     static const int replyBufferSize = 64;
 };
 

@@ -43,12 +43,13 @@ Pinger::~Pinger()
 {
 }
 
-std::vector<Pinger::uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
+std::vector<Pinger::uint> Pinger::ping(uint srcIPv4, uint netStart, uint netEnd, std::chrono::milliseconds timeout)
 {
+    std::vector<uint> hosts;
     io_service ioService;
     ip::icmp::socket icmpSocket(ioService, ip::icmp::v4());
+    icmpSocket.bind(ip::icmp::endpoint(ip::address_v4(srcIPv4), 0));
 
-    std::vector<uint> hosts;
     //TODO: split to chunks of max available requests
     std::size_t numOfHosts = netEnd - netStart;
     if (numOfHosts > 0xFFFF) {

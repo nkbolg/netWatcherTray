@@ -155,7 +155,7 @@ void Widget::onTimerEvent()
         pingerThread.join();
     }
     pingerThread = std::thread([this](){
-       auto res = pinger.ping(netStartIpv4, netEndIpv4, 7s);
+       auto res = pinger.ping(srcIpv4, netStartIpv4, netEndIpv4, 7s);
 
        qDebug () << res.size();
        for (auto&& elem : res)
@@ -181,7 +181,7 @@ void Widget::onTimerEvent()
        NetworkState::State tmpState;
        //ping google dns to check internet access
        quint32 googlePublicDNS = 0x08080808;
-       res = pinger.ping(googlePublicDNS, googlePublicDNS+1, 1s);
+       res = pinger.ping(srcIpv4, googlePublicDNS, googlePublicDNS+1, 1s);
 
        qDebug () << res.size();
        for (auto&& elem : res)
