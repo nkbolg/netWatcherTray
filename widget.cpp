@@ -10,6 +10,15 @@
 
 Q_DECLARE_METATYPE(QNetworkAddressEntry)
 
+class BooleanScopeGuard
+{
+public:
+    BooleanScopeGuard(std::atomic_bool &boolean) : boolean(boolean){ boolean = true; qDebug () << "True"; }
+    ~BooleanScopeGuard() { boolean = false; qDebug () << "False"; }
+private:
+    std::atomic_bool &boolean;
+};
+
 Widget::Widget()
     : QObject(),
       currentState(&trayIcon),
@@ -137,7 +146,7 @@ bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces
     return true;
 }
 
-Widget::~Widget()
+void Widget::stopScan()
 {
     if (pingerThread.joinable())
     {
@@ -146,6 +155,11 @@ Widget::~Widget()
         }
         pingerThread.join();
     }
+}
+
+Widget::~Widget()
+{
+    stopScan();
 }
 
 void Widget::showIcon()
@@ -163,8 +177,7 @@ void Widget::onTimerEvent()
         pingerThread.join();
     }
     pingerThread = std::thread([this](){
-        //TODO: add scope guard for threadWorking
-       threadWorking = true;
+       BooleanScopeGuard booleanScopeGuard(threadWorking);
        qDebug () << "Ping started";
 
        auto res = pinger.ping(netStartIpv4, netEndIpv4, 7s);
@@ -215,7 +228,6 @@ void Widget::onTimerEvent()
        }
        currentState = tmpState;
        emit updateTrayMenu();
-       threadWorking = false;
     });
 }
 
@@ -246,12 +258,13 @@ void Widget::onUpdateTrayMenu()
 
 void Widget::onSetInterfaceActive(QAction *sender)
 {
-    //TODO: добавить прерывание активного сканирования
     bool ok = false;
     quint32 tempIPv4 = QHostAddress(sender->text()).toIPv4Address(&ok);
-    if (!ok) {
+    if (!ok || (tempIPv4 == srcIpv4)) {
         return;
     }
+
+    stopScan();
 
     QNetworkAddressEntry addr = sender->data().value<QNetworkAddressEntry>();
     srcIpv4 = tempIPv4;

@@ -80,6 +80,7 @@ private:
     quint32 netEndIpv4;
 
     static const ThrustLevel maxThrustLevel = 2;
+    void stopScan();
 };
 
 #endif // WIDGET_H
