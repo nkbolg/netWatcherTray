@@ -1,30 +1,21 @@
 #include "widget.h"
 
-#include <QtEndian>
 #include <QNetworkInterface>
 #include <QHostAddress>
 #include <QTimer>
 #include <QDebug>
-
 #include <QApplication>
 #include <QMessageBox>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QListWidget>
-#include <QList>
 #include <QString>
-#include <QMenu>
 
-#include "Pinger/Pinger.h"
-
+Q_DECLARE_METATYPE(QNetworkAddressEntry)
 
 Widget::Widget()
     : QObject(),
       currentState(&trayIcon),
-      pingerPtr (std::make_unique<Pinger>()),
-      trayContextMenu (std::make_unique<QMenu>()),
+      persistentActionGroup(this),
       threadWorking(false),
-      timer( new QTimer(this) ),
+      timer(new QTimer(this)),
       srcIpv4(0)
 {
     timer->setInterval(1000*10);
@@ -32,12 +23,13 @@ Widget::Widget()
 
     connect(this, &Widget::updateTrayMenu, this, &Widget::onUpdateTrayMenu);
 
-    if (!setupNetworkInterface()) {
+    std::vector<QNetworkAddressEntry> interfaces;
+    if (!setupNetworkInterface(interfaces)) {
         qApp->quit();
         return;
     }
 
-    setupPersistentMenu();
+    setupPersistentMenu(interfaces);
 
     timer->start();
 }
@@ -62,41 +54,39 @@ std::vector<QNetworkAddressEntry> Widget::getFilteredAddressEntries()
     return resultVector;
 }
 
-void Widget::setupPersistentMenu()
+void Widget::setupPersistentMenu(const std::vector<QNetworkAddressEntry> &interfaces)
 {
     currentState = NetworkState::Good;
 
-    persistentActionsList << new QAction(QStringLiteral("Interfaces"), this);
-
-    auto actionSep = new QAction(this);
-    actionSep->setSeparator(true);
-    persistentActionsList << actionSep;
+    persistentActionGroup.addAction(QStringLiteral("Interfaces"));
+    persistentActionGroup.addAction(QString())->setSeparator(true);
 
     for (auto &&entry : interfaces)
     {
-        auto act = new QAction(entry.toString(), this);
-        if (entry.toIPv4Address() == srcIpv4) {
-            act->setCheckable(true);
+        QHostAddress hostAddr = entry.ip();
+        auto act = persistentActionGroup.addAction(hostAddr.toString());
+        act->setCheckable(true);
+        QVariant var;
+        var.setValue<QNetworkAddressEntry>(entry);
+        act->setData(var);
+        if (hostAddr.toIPv4Address() == srcIpv4) {
             act->setChecked(true);
         }
-        persistentActionsList << act;
     }
 
-    actionSep = new QAction(this);
-    actionSep->setSeparator(true);
-    persistentActionsList << actionSep;
+    persistentActionGroup.addAction(QString())->setSeparator(true);
 
-    auto actExit = new QAction(QStringLiteral("Exit"), this);
+    auto actExit = persistentActionGroup.addAction(QStringLiteral("Exit"));
     connect(actExit, &QAction::triggered, qApp, &QApplication::quit);
 
-    persistentActionsList << actExit;
+    connect(&persistentActionGroup, &QActionGroup::triggered, this, &Widget::onSetInterfaceActive);
 
-    trayContextMenu->addActions(persistentActionsList);
+    trayContextMenu.addActions(persistentActionGroup.actions());
 
-    trayIcon.setContextMenu(trayContextMenu.get());
+    trayIcon.setContextMenu(&trayContextMenu);
 }
 
-bool Widget::setupNetworkInterface()
+bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces)
 {
     if (srcIpv4 != 0) {
         return true;
@@ -114,7 +104,7 @@ bool Widget::setupNetworkInterface()
             continue;
         }
 
-        interfaces.push_back(hostAddress);
+        interfaces.push_back(addressEntry);
 
         if (srcIpv4 == 0) {
             suitableAddress = convertedAddress;
@@ -122,8 +112,8 @@ bool Widget::setupNetworkInterface()
             netStartIpv4 = ((suitableAddress >> netmask) << netmask) + 1;
             netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
 
-            if (hostAddress.isInSubnet(QHostAddress("192.168.0.0"), 16) ||
-                    hostAddress.isInSubnet(QHostAddress("10.0.0.0"), 8))
+            if (hostAddress.isInSubnet(QHostAddress(QStringLiteral("192.168.0.0")), 16) ||
+                    hostAddress.isInSubnet(QHostAddress(QStringLiteral("10.0.0.0")), 8))
             {
                 srcIpv4 = suitableAddress;
             }
@@ -131,13 +121,13 @@ bool Widget::setupNetworkInterface()
     }
     if (suitableAddress == 0)
     {
-        QMessageBox::warning(0, "No suitable Ipv4 interface found", "No suitable Ipv4 interface found.\nApplication is shutting down.");
+        QMessageBox::warning(0, QStringLiteral("No suitable Ipv4 interface found"), QStringLiteral("No suitable Ipv4 interface found.\nApplication is shutting down."));
         return false;
     }
     //autoconf ipv4 ( 169.254.248.201 ) - invalid
     if (suitableAddress == 0xA9FEF8C9 && srcIpv4 == 0)
     {
-        QMessageBox::warning(0, "Ipv4 autoconfigurated interface found", "Ipv4 autoconfigurated interface found.\nApplication is shutting down.");
+        QMessageBox::warning(0, QStringLiteral("Ipv4 autoconfigurated interface found"), QStringLiteral("Ipv4 autoconfigurated interface found.\nApplication is shutting down."));
         return false;
     }
     else if (srcIpv4 == 0)
@@ -176,7 +166,7 @@ void Widget::onTimerEvent()
        threadWorking = true;
        qDebug () << "Ping started";
 
-       auto res = pingerPtr->ping(netStartIpv4, netEndIpv4, 7s);
+       auto res = pinger.ping(netStartIpv4, netEndIpv4, 7s);
 
        qDebug () << res.size();
        for (auto&& elem : res)
@@ -202,7 +192,7 @@ void Widget::onTimerEvent()
        NetworkState::State tmpState;
        //ping google dns to check internet access
        quint32 googlePublicDNS = 0x08080808;
-       res = pingerPtr->ping(googlePublicDNS, googlePublicDNS+1, 1s);
+       res = pinger.ping(googlePublicDNS, googlePublicDNS+1, 1s);
 
        qDebug () << res.size();
        for (auto&& elem : res)
@@ -230,8 +220,7 @@ void Widget::onTimerEvent()
 
 void Widget::onUpdateTrayMenu()
 {
-//    trayIcon.showMessage("Menu update", "Update requsted");
-    trayContextMenu->clear();
+    trayContextMenu.clear();
 
     qDeleteAll(temporaryActionsList);
     temporaryActionsList.clear();
@@ -250,8 +239,24 @@ void Widget::onUpdateTrayMenu()
     sep->setSeparator(true);
     temporaryActionsList << sep;
 
-    trayContextMenu->addActions(temporaryActionsList);
-    trayContextMenu->addActions(persistentActionsList);
+    trayContextMenu.addActions(temporaryActionsList);
+    trayContextMenu.addActions(persistentActionGroup.actions());
+}
+
+void Widget::onSetInterfaceActive(QAction *sender)
+{
+    //TODO: добавить прерывание активного сканирования
+    bool ok = false;
+    quint32 tempIPv4 = QHostAddress(sender->text()).toIPv4Address(&ok);
+    if (!ok) {
+        return;
+    }
+
+    QNetworkAddressEntry addr = sender->data().value<QNetworkAddressEntry>();
+    srcIpv4 = tempIPv4;
+    int netmask = 32 - addr.prefixLength();
+    netStartIpv4 = ((srcIpv4 >> netmask) << netmask) + 1;
+    netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
 }
 
 Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState::State &state)
@@ -262,20 +267,20 @@ Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState
     currState = state;
     switch (currState) {
     case Good:
-        icon->setToolTip("Ok");
-        icon->setIcon(QIcon(":/images/ok.png"));
+        icon->setToolTip(QStringLiteral("Ok"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/ok.png")));
         break;
     case NoInternetAccess:
-        icon->setToolTip("No internet access");
-        icon->setIcon(QIcon(":/images/noint.png"));
+        icon->setToolTip(QStringLiteral("No internet access"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/noint.png")));
         break;
     case NoLocalNetAccess:
-        icon->setToolTip("No local network access");
-        icon->setIcon(QIcon(":/images/noloc.png"));
+        icon->setToolTip(QStringLiteral("No local network access"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/noloc.png")));
         break;
     default:
         icon->setIcon(QIcon());
-        icon->setToolTip("Err");
+        icon->setToolTip(QStringLiteral("Err"));
         break;
     }
     return *this;

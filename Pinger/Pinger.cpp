@@ -51,7 +51,7 @@ void Pinger::stop()
     }
 }
 
-std::vector<uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
+std::vector<Pinger::uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
 {
     ioService = std::make_unique<io_service>();
     stopped = false;

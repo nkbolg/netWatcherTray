@@ -9,7 +9,6 @@
 
 using namespace std::chrono_literals;
 
-typedef unsigned int uint;
 
 namespace boost {
 namespace asio {
@@ -23,6 +22,7 @@ public:
     Pinger();
     ~Pinger();
 
+    typedef unsigned int uint;
     std::vector<uint> ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout = 10s);
     void stop();
 private:
