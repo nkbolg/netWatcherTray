@@ -8,6 +8,8 @@
 #include <QMessageBox>
 #include <QString>
 
+#include "requstperfomer.h"
+
 Q_DECLARE_METATYPE(QNetworkAddressEntry)
 
 Widget::Widget()

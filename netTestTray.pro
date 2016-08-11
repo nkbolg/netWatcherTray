@@ -16,12 +16,14 @@ CONFIG += c++14
 
 SOURCES += main.cpp\
         widget.cpp \
-    Pinger/Pinger.cpp
+    Pinger/Pinger.cpp \
+    Pinger/requstperfomer.cpp
 
 HEADERS  += widget.h \
     Pinger/icmp_header.hpp \
     Pinger/ipv4_header.hpp \
-    Pinger/Pinger.h
+    Pinger/Pinger.h \
+    Pinger/requstperfomer.h
 
 INCLUDEPATH += $$PWD/Pinger
 LIBS += "-L$$PWD/Pinger/libs/native/address-model-64/lib/"
