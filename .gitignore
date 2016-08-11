@@ -30,7 +30,6 @@
 
 *.pro.user*
 *boost*
-images*
 *.sln
 *.sdf
 *.VC.db

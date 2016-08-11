@@ -3,5 +3,6 @@
         <file>images/noint.png</file>
         <file>images/noloc.png</file>
         <file>images/ok.png</file>
+        <file>images/nodns.png</file>
     </qresource>
 </RCC>

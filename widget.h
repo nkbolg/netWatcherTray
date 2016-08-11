@@ -45,6 +45,7 @@ private:
         enum State
         {
         Good,
+        NoDNS,
         NoInternetAccess,
         NoLocalNetAccess,
         Invalid

@@ -180,7 +180,6 @@ void Widget::onTimerEvent()
            }
        }
 
-       NetworkState::State tmpState;
        //ping google dns to check internet access
        quint32 googlePublicDNS = 0x08080808;
        res = pinger.ping(srcIpv4, googlePublicDNS, googlePublicDNS+1, 1s);
@@ -191,18 +190,23 @@ void Widget::onTimerEvent()
            qDebug () << QHostAddress(elem).toString();
        }
 
-       if (res.size() == 1 && res[0] == googlePublicDNS) {
-           tmpState = NetworkState::Good;
-       }
-       else
-       {
-           tmpState = NetworkState::NoInternetAccess;
-       }
+       bool dnsOk = !(RequstPerfomer::performDNSRequest("ya.ru").empty());
+
+       NetworkState::State tmpState = NetworkState::Good;
 
        if (presentNodes.size() == 0 ||
            presentNodes.size() == 1 && presentNodes.count(srcIpv4)) {
            tmpState = NetworkState::NoLocalNetAccess;
        }
+
+       else if (res.size() != 1 || res[0] != googlePublicDNS) {
+           tmpState = NetworkState::NoInternetAccess;
+       }
+
+       else if (!dnsOk) {
+           tmpState = NetworkState::NoDNS;
+       }
+
        currentState = tmpState;
        emit updateTrayMenu();
     });
@@ -259,6 +263,10 @@ Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState
     case Good:
         icon->setToolTip(QStringLiteral("Ok"));
         icon->setIcon(QIcon(QStringLiteral(":/images/ok.png")));
+        break;
+    case NoDNS:
+        icon->setToolTip(QStringLiteral("No dns access"));
+        icon->setIcon(QIcon(QStringLiteral(":/images/nodns.png")));
         break;
     case NoInternetAccess:
         icon->setToolTip(QStringLiteral("No internet access"));
