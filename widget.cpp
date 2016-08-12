@@ -198,7 +198,7 @@ void Widget::onTimerEvent()
        }
 
        if (presentNodes.size() == 0 ||
-           presentNodes.size() == 1 && presentNodes.count(srcIpv4)) {
+           (presentNodes.size() == 1 && presentNodes.count(srcIpv4))) {
            tmpState = NetworkState::NoLocalNetAccess;
        }
        currentState = tmpState;
