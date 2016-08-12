@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <atomic>
+#include <mutex>
 
 using namespace std::chrono_literals;
 
@@ -32,6 +33,7 @@ private:
 
     std::unique_ptr<boost::asio::io_service> ioService;
     std::atomic_bool stopped;
+    std::mutex mutex;
 };
 
 

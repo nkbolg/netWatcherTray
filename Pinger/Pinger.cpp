@@ -45,6 +45,7 @@ Pinger::~Pinger()
 
 void Pinger::stop()
 {
+    std::lock_guard<std::mutex> lock(mutex);
     stopped = true;
     if (ioService.get()) {
         ioService->stop();
@@ -53,16 +54,14 @@ void Pinger::stop()
 
 std::vector<Pinger::uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::milliseconds timeout)
 {
+    std::vector<uint> hosts;
     ioService = std::make_unique<io_service>();
     stopped = false;
+    {
     ip::icmp::socket icmpSocket(*ioService.get(), ip::icmp::v4());
 
-    std::vector<uint> hosts;
     //TODO: split to chunks of max available requests
     std::size_t numOfHosts = netEnd - netStart;
-    if (numOfHosts > 0xFFFF) {
-        return hosts;
-    }
     std::size_t replyBufSize = numOfHosts * replyBufferSize;
     
     std::unique_ptr<unsigned char, void(*)(unsigned char*)> replyBuf((unsigned char*)std::malloc(replyBufSize),
@@ -152,6 +151,10 @@ std::vector<Pinger::uint> Pinger::ping(uint netStart, uint netEnd, std::chrono::
     if (!stopped) {
         ioService->run();
     }
+
+    }
+
+    std::lock_guard<std::mutex> lock(mutex);
     ioService.reset(nullptr);
 
     return hosts;
