@@ -10,10 +10,20 @@
 
 Q_DECLARE_METATYPE(QNetworkAddressEntry)
 
+class BooleanScopeGuard
+{
+public:
+    BooleanScopeGuard(std::atomic_bool &boolean) : boolean(boolean){ boolean = true; qDebug () << "True"; }
+    ~BooleanScopeGuard() { boolean = false; qDebug () << "False"; }
+private:
+    std::atomic_bool &boolean;
+};
+
 Widget::Widget()
     : QObject(),
       currentState(&trayIcon),
       persistentActionGroup(this),
+      threadWorking(false),
       timer(new QTimer(this)),
       srcIpv4(0)
 {
@@ -136,12 +146,20 @@ bool Widget::setupNetworkInterface(std::vector<QNetworkAddressEntry> &interfaces
     return true;
 }
 
-Widget::~Widget()
+void Widget::stopScan()
 {
     if (pingerThread.joinable())
     {
+        if (threadWorking) {
+            pinger.stop();
+        }
         pingerThread.join();
     }
+}
+
+Widget::~Widget()
+{
+    stopScan();
 }
 
 void Widget::showIcon()
@@ -151,10 +169,17 @@ void Widget::showIcon()
 
 void Widget::onTimerEvent()
 {
+    qDebug () << "Timer event";
+    if (threadWorking) {
+        return;
+    }
     if (pingerThread.joinable()) {
         pingerThread.join();
     }
     pingerThread = std::thread([this](){
+       BooleanScopeGuard booleanScopeGuard(threadWorking);
+       qDebug () << "Ping started";
+
        auto res = pinger.ping(srcIpv4, netStartIpv4, netEndIpv4, 7s);
 
        qDebug () << res.size();
@@ -235,16 +260,17 @@ void Widget::onSetInterfaceActive(QAction *sender)
 {
     bool ok = false;
     quint32 tempIPv4 = QHostAddress(sender->text()).toIPv4Address(&ok);
-    if (!ok) {
+    if (!ok || (tempIPv4 == srcIpv4)) {
         return;
     }
+
+    stopScan();
 
     QNetworkAddressEntry addr = sender->data().value<QNetworkAddressEntry>();
     srcIpv4 = tempIPv4;
     int netmask = 32 - addr.prefixLength();
     netStartIpv4 = ((srcIpv4 >> netmask) << netmask) + 1;
     netEndIpv4 = netStartIpv4 + (1 << netmask) - 2;
-    //TODO: добавить прерывание активного сканирования
 }
 
 Widget::NetworkState &Widget::NetworkState::operator=(const Widget::NetworkState::State &state)

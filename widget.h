@@ -3,6 +3,7 @@
 
 #include <map>
 #include <thread>
+#include <atomic>
 
 #include <QSystemTrayIcon>
 #include <QActionGroup>
@@ -70,6 +71,7 @@ private:
     QActionGroup persistentActionGroup;
     QList<QAction*> temporaryActionsList;
     std::thread pingerThread;
+    std::atomic_bool threadWorking;
 
     QTimer *timer;
 
@@ -78,6 +80,7 @@ private:
     quint32 netEndIpv4;
 
     static const ThrustLevel maxThrustLevel = 2;
+    void stopScan();
 };
 
 #endif // WIDGET_H

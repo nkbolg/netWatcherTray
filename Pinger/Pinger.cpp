@@ -43,18 +43,25 @@ Pinger::~Pinger()
 {
 }
 
+void Pinger::stop()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    stopped = true;
+    if (ioService.get()) {
+        ioService->stop();
+    }
+}
+
 std::vector<Pinger::uint> Pinger::ping(uint srcIPv4, uint netStart, uint netEnd, std::chrono::milliseconds timeout)
 {
     std::vector<uint> hosts;
-    io_service ioService;
-    ip::icmp::socket icmpSocket(ioService, ip::icmp::v4());
-    icmpSocket.bind(ip::icmp::endpoint(ip::address_v4(srcIPv4), 0));
+    ioService = std::make_unique<io_service>();
+    stopped = false;
+    {
+    ip::icmp::socket icmpSocket(*ioService.get(), ip::icmp::v4());
 
     //TODO: split to chunks of max available requests
     std::size_t numOfHosts = netEnd - netStart;
-    if (numOfHosts > 0xFFFF) {
-        return hosts;
-    }
     std::size_t replyBufSize = numOfHosts * replyBufferSize;
     
     std::unique_ptr<unsigned char, void(*)(unsigned char*)> replyBuf((unsigned char*)std::malloc(replyBufSize),
@@ -74,22 +81,30 @@ std::vector<Pinger::uint> Pinger::ping(uint srcIPv4, uint netStart, uint netEnd,
     std::thread worker;
     std::size_t counter = 0;
 
-    basic_waitable_timer<std::chrono::high_resolution_clock> timer(ioService);
+    basic_waitable_timer<std::chrono::high_resolution_clock> timer(*ioService.get());
 
     for (uint addr = netStart; addr < netEnd; addr++)
     {
-        icmpSocket.async_send_to(buffer(requestBuf),ip::icmp::endpoint(ip::address_v4(addr),0),[addr]
-        (const boost::system::error_code& error, std::size_t /*bytes_transferred*/)
+        if (stopped) {
+            break;
+        }
+        icmpSocket.async_send_to(buffer(requestBuf),ip::icmp::endpoint(ip::address_v4(addr),0),[]
+        (const boost::system::error_code& /*error*/, std::size_t /*bytes_transferred*/)
         {
-            if (error)
-            {
+//            if (error)
+//            {
 //                std::cout << addr << " send err: " << error << std::endl;
-            }
+//            }
         });
 
         icmpSocket.async_receive(buffer(data, replyBufferSize),
-            [data, replyBufferSize = this->replyBufferSize, &hosts, &counter, &numOfHosts, &timer]
+            [data, replyBufferSize = this->replyBufferSize,
+             &hosts, &counter, &numOfHosts, &timer,
+             &stopped = this->stopped, ioServicePtr = ioService.get()]
         (const boost::system::error_code& /*error*/, std::size_t /*bytes_transferred*/) {
+            if (stopped) {
+                ioServicePtr->stop();
+            }
             counter++;
             if (counter == numOfHosts)
             {
@@ -115,12 +130,12 @@ std::vector<Pinger::uint> Pinger::ping(uint srcIPv4, uint netStart, uint netEnd,
 
         if (addr % 64 == 0 && !worker.joinable())
         {
-            worker = std::thread([service = &ioService]{ service->run(); });
+            worker = std::thread([service = ioService.get(), &stopped = this->stopped]{ if (!stopped) service->run(); });
         }
     }
 
     timer.expires_from_now(timeout);
-    timer.async_wait([service = &ioService]
+    timer.async_wait([service = ioService.get()]
     (const boost::system::error_code& error)
     {
         if (!error)
@@ -133,8 +148,14 @@ std::vector<Pinger::uint> Pinger::ping(uint srcIPv4, uint netStart, uint netEnd,
     {
         worker.join();
     }
-    ioService.run();
-    ioService.reset();
+    if (!stopped) {
+        ioService->run();
+    }
+
+    }
+
+    std::lock_guard<std::mutex> lock(mutex);
+    ioService.reset(nullptr);
 
     return hosts;
 }
