@@ -59,6 +59,7 @@ std::vector<Pinger::uint> Pinger::ping(uint srcIPv4, uint netStart, uint netEnd,
     stopped = false;
     {
     ip::icmp::socket icmpSocket(*ioService.get(), ip::icmp::v4());
+    icmpSocket.bind(ip::icmp::endpoint(ip::address_v4(srcIPv4), 0));
 
     //TODO: split to chunks of max available requests
     std::size_t numOfHosts = netEnd - netStart;
